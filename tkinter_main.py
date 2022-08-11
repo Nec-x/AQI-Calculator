@@ -73,7 +73,10 @@ def file_or_api_chooser():
         loc_input.config(state=DISABLED)
         ran_input.config(state=DISABLED)
 
+        display.config(state=NORMAL)
         display.delete(1.0, END)
+        display.config(state=DISABLED)
+
         file = Toplevel(window)
         fi = Label(file, text="Input a File Path to Retrieve Data from a previous call to the PurpleAir API.\nLeave blank to use the API.")
         fi_inp = Entry(file)
@@ -88,32 +91,40 @@ def runner(thresh, max, location, ranger, file = None):
     geo.add_location(location)
     coords = geo.get_coords()
     all.add_coords(int(coords[0]),int(coords[1]))
-    if file != None:
-        all.add_file(file)
+    try:
+        if file != None:
+            all.add_file(file)
 
-        all.collect_data(api=False)
-        info = all.sorted_sensor_list(all.data, int(ranger), int(thresh))
+            all.collect_data(api=False)
+            info = all.sorted_sensor_list(all.data, int(ranger), int(thresh))
 
-        geo.add_sensors(info)
-        final_lst = geo.get_locations(int(max))
-    else:
-        all.collect_data()
-        info = all.sorted_sensor_list(all.data, int(ranger), int(thresh))
-        geo.add_sensors(info)
-        final_lst = geo.get_locations(int(max))
+            geo.add_sensors(info)
+            final_lst = geo.get_locations(int(max))
+        else:
+            all.collect_data()
+            info = all.sorted_sensor_list(all.data, int(ranger), int(thresh))
+            geo.add_sensors(info)
+            final_lst = geo.get_locations(int(max))
 
-    display.config(state=NORMAL)
+        display.config(state=NORMAL)
 
-    if len(final_lst) == 0:
-        display.insert(INSERT, "No areas matched your criteria, please try again" + '\n\n')
-    for i in final_lst:
-        codex = f"AQI Value: {i[2]}\nLat/Lon: ({i[0]},{i[1]})\nLocation: {i[3]}"
-        display.insert(INSERT, str(codex)+'\n\n')
-    display.config(state=DISABLED)
-    thresh_input.config(state=NORMAL)
-    max_input.config(state=NORMAL)
-    loc_input.config(state=NORMAL)
-    ran_input.config(state=NORMAL)
+        if len(final_lst) == 0:
+            display.insert(INSERT, "No areas matched your criteria, please try again" + '\n\n')
+        for i in final_lst:
+            codex = f"AQI Value: {i[2]}\nLat/Lon: ({i[0]},{i[1]})\nLocation: {i[3]}"
+            display.insert(INSERT, str(codex)+'\n\n')
+        display.config(state=DISABLED)
+        thresh_input.config(state=NORMAL)
+        max_input.config(state=NORMAL)
+        loc_input.config(state=NORMAL)
+        ran_input.config(state=NORMAL)
+    except:
+        messagebox.showwarning("API Error", "Please try again later. A problem occured when accessing the API servers.")
+        display.config(state=DISABLED)
+        thresh_input.config(state=NORMAL)
+        max_input.config(state=NORMAL)
+        loc_input.config(state=NORMAL)
+        ran_input.config(state=NORMAL)
 
 window = Tk()
 window.geometry("600x800")
