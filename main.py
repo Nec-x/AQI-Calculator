@@ -1,76 +1,184 @@
-import urllib.request
-import json
-import pathlib
+from tkinter import *
+from tkinter import messagebox
+import sensor_gathering_data as sgd
+import geocoding as gc
+from pathlib import Path
+def clear():
+    thresh_input.delete(0, END)
+    max_input.delete(0, END)
+    loc_input.delete(0, END)
+    ran_input.delete(0, END)
+def inst():
+    file = Toplevel(window)
+    configfile = Text(file)
+    configfile.grid(row = 0, column = 1, sticky = N+S+E+W)
 
-def good_prompt_file(prompt = ''):
-    file = input(prompt)
-    while True:
+    file.rowconfigure(0, weight=1)
+    file.columnconfigure(1, weight=1)
+
+    with open("read_me.txt", 'r') as f:
+        configfile.insert(INSERT, f.read())
+    configfile.config(state = DISABLED)
+
+def error_handler():
+    x = [thresh_input.get(),max_input.get(),loc_input.get(),ran_input.get()]
+
+
+    if thresh_input.get() == '' or isinstance(thresh_input.get(), (int, float)):
+        messagebox.showwarning("AQI Error", "Please enter a valid integer.")
+    elif max_input.get() == '' or isinstance(max_input.get(), (int, float)):
+        messagebox.showwarning("Max Outputs Error", "Please enter a valid integer.")
+    elif loc_input.get() == '':
+        messagebox.showwarning("Location Error", "Please enter a location.")
+    elif ran_input.get() == '' or isinstance(ran_input.get(), (int, float)):
+        messagebox.showwarning("Range Error", "Please enter a valid integer.")
+    else: return True
+
+def file_existence(path):
+    s = r'{}'.format(path)
+    x = Path(s)
+    if x.exists():
         try:
-            file = pathlib.Path(file)
-            if file.is_file() != True:
-                file = input("Please enter a correct input: ")
-            else:
-                print()
-                return file
+            test = sgd.Sensors()
+            test.add_file(s)
+            test.collect_data(api = False)
         except:
-            print("boo")
-            file = input("Please enter a correct input: ")
+            return False
+        return True
+    else:
+        return False
 
-def good_prompt_str(prompt, *args):
-    string = input(prompt)
-    while string not in args:
-        string = input("Please enter a correct input: ")
-    print()
-    return string
+def file_or_api_chooser():
+    def ender():
+        file_or_api = fi_inp.get()
 
-def good_prompt_int(prompt, value):
-    #0 == Pos. or Zero
-    #1 == Pos Only
+        if file_or_api != '':
+            if file_existence(file_or_api):
+                file.destroy()
+                runner(aqi_threshold, max_outputs, location, ranger, file=file_or_api)
+            else:
+                messagebox.showwarning("File Error", "Please enter a valid file.")
+        else:
+            file.destroy()
+            runner(aqi_threshold, max_outputs, location, ranger)
 
-    integer = input(prompt)
-    while True:
-        if integer.isdigit():
-            integer = int(integer)
-            if value == 0:
-                if integer >= 0:
-                    print()
-                    return integer
-            elif value == 1:
-                if integer > 0:
-                    print()
-                    return integer
+    aqi_threshold = thresh_input.get()
+    max_outputs = max_input.get()
+    location = loc_input.get()
+    ranger = ran_input.get()
 
-        integer = input("Please enter a correct input: ")
+    if error_handler():
+        thresh_input.config(state=DISABLED)
+        max_input.config(state=DISABLED)
+        loc_input.config(state=DISABLED)
+        ran_input.config(state=DISABLED)
+
+        display.config(state=NORMAL)
+        display.delete(1.0, END)
+        display.config(state=DISABLED)
+
+        file = Toplevel(window)
+        fi = Label(file, text="Input a File Path to Retrieve Data from a previous call to the PurpleAir API.\nLeave blank to use the API.")
+        fi_inp = Entry(file)
+        fi.pack()
+        fi_inp.pack()
+        enter = Button(file, text="Enter to Continue", command=ender)
+        enter.pack()
+
+def runner(thresh, max, location, ranger, file = None):
+    all = sgd.Sensors()
+    geo = gc.Geocode()
+    geo.add_location(location)
+    coords = geo.get_coords()
+    all.add_coords(int(coords[0]),int(coords[1]))
+    try:
+        if file != None:
+            all.add_file(file)
+
+            all.collect_data(api=False)
+            info = all.sorted_sensor_list(all.data, int(ranger), int(thresh))
+
+            geo.add_sensors(info)
+            final_lst = geo.get_locations(int(max))
+        else:
+            all.collect_data()
+            info = all.sorted_sensor_list(all.data, int(ranger), int(thresh))
+            geo.add_sensors(info)
+            final_lst = geo.get_locations(int(max))
+
+        display.config(state=NORMAL)
+
+        if len(final_lst) == 0:
+            display.insert(INSERT, "No areas matched your criteria, please try again" + '\n\n')
+        for i in final_lst:
+            codex = f"AQI Value: {i[2]}\nLat/Lon: ({i[0]},{i[1]})\nLocation: {i[3]}"
+            display.insert(INSERT, str(codex)+'\n\n')
+        display.config(state=DISABLED)
+        thresh_input.config(state=NORMAL)
+        max_input.config(state=NORMAL)
+        loc_input.config(state=NORMAL)
+        ran_input.config(state=NORMAL)
+    except:
+        messagebox.showwarning("API Error", "Please try again later. A problem occured when accessing the API servers.")
+        display.config(state=DISABLED)
+        thresh_input.config(state=NORMAL)
+        max_input.config(state=NORMAL)
+        loc_input.config(state=NORMAL)
+        ran_input.config(state=NORMAL)
+
+window = Tk()
+window.geometry("600x800")
+window.title("Air Quality Index Calculator")
+#Variables that will be used in the program aspect
+aqi_or_file = None
 
 
-is_Nominatim_or_File = good_prompt_str("Will you be using a location name, or a pre-existing file as a center point for analysis?\nInput NOMINATIM or FILE: ", "NOMINATIM", "FILE")
+framer = LabelFrame(window,text = "Options")
+framer.grid(column = 0, row = 0, sticky = NW)
 
-if is_Nominatim_or_File == "NOMINATIM":
-    location = input("Insert a location in order to use it as the center point: ")
-    print()
-else:
-    location = good_prompt_file("Insert a file path in order to use the center point: ")
+loc = Label(framer, text = "Location")
+loc_input = Entry(framer)
+loc.grid(row = 1 , column = 0)
+loc_input.grid(row = 1 , column = 1)
 
-range_in_miles = good_prompt_int("Input an integer in miles, which will be the range that will be searched from the center point: ", 1)
-threshold = good_prompt_int("Input an integer, which will be the threshold that will used to search for AQI levels at least as high as itself: ", 0)
-max_locations = good_prompt_int("Input an integer, which will be the max locations that will be shown: ", 1)
-
-aqi_or_file = good_prompt_str("Will you be using a call to PurpleAir's API, or a pre-existing file that contains a previous call to the PurpleAir API?\nInput PURPLEAIR or FILE: ", "PURPLEAIR", "FILE")
-if aqi_or_file == "PURPLEAIR":
-    #call to the api
-    pass
-else:
-    pa_data = good_prompt_file("Insert a file path in order to use data from a call to PurpleAir's API: ")
-
-reverse_geo = good_prompt_str("Will you be using Nominatim's API for reverse geocoding, or pre-existing files as calls to Nominatim's API?\nInput NOMINATIM or FILE: ", "NOMINATIM", "FILE")
-if reverse_geo == "NOMINATIM":
-    #call to api
-    pass
-else:
-    reverse = []
-    print("Please input until no longer prompted")
-    for i in range(max_locations):
-        reverse.append(good_prompt_file())
+thresh = Label(framer, text = "Minimum AQI")
+thresh_input = Entry(framer)
+thresh.grid(row = 2 , column = 0)
+thresh_input.grid(row = 2 , column = 1)
 
 
-print(location, range_in_miles, threshold, max_locations, pa_data, reverse)
+ran = Label(framer, text = "Range (In Miles)")
+ran_input = Entry(framer)
+ran.grid(row = 3 , column = 0)
+ran_input.grid(row = 3 , column = 1)
+
+
+max_o = Label(framer, text = "Max Outputs")
+max_input = Entry(framer)
+max_o.grid(row = 4 , column = 0)
+max_input.grid(row = 4 , column = 1)
+
+
+display = Text(window, state = DISABLED)
+display.grid(row = 0, column = 1,sticky = N + S + E + W)
+
+window.rowconfigure(0, weight = 1)
+window.columnconfigure(1, weight = 1)
+v=Scrollbar(window, orient='vertical')
+v.grid(row = 0, column = 2,sticky = E)
+
+display.config(yscrollcommand=v.set)
+v.config(command=display.yview)
+
+start = Button(framer, text = "Start",command = file_or_api_chooser)
+start.grid(row = 5, column = 0, sticky = W)
+
+clear = Button(framer, text = "Clear",command = clear)
+clear.grid(row = 5, column = 1, sticky = W)
+
+help = Button(framer, text = "Instructions", command = inst)
+help.grid(row = 5, column = 2, sticky = E)
+
+
+window.mainloop()
+
