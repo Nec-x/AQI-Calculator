@@ -16,7 +16,7 @@ def inst():
     file.rowconfigure(0, weight=1)
     file.columnconfigure(1, weight=1)
 
-    with open("read_me.txt", 'r') as f:
+    with open("previous_api_call.txt", 'r') as f:
         configfile.insert(INSERT, f.read())
     configfile.config(state = DISABLED)
 
